@@ -10,14 +10,17 @@ app = Flask(__name__)
 
 coords = None
 
+# Home Page 
 @app.route('/')
 def home():
     return render_template('base.html')
 
+# Extra Environment for testing
 @app.route('/1')
 def page_1():
 	return render_template('base2.html')
 
+# whiteboard canvas url route
 @app.route('/draw')
 def whiteboard():
 	return render_template('draw.html')
@@ -27,6 +30,9 @@ def get_curr_image():
 	global coords
 	return jsonify({"coords": coords})
 
+# converts the IK servo angles to a protocol understandable by 
+# armMotor.py on the pi. Also sends the full file to the pi for 
+# instant post-simulation runtime
 @app.route('/get_angles', methods=["POST"])
 def get_angles():
 	parsed_data = request.get_json(force = True)
@@ -47,6 +53,8 @@ def get_angles():
 
 	return jsonify({"status": 200})
 	
+# Used to save the whiteboard image, 
+# was used in a previous iteration of code. 
 @app.route('/save', methods=["POST"])
 def saveimage():
 	global coords

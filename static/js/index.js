@@ -50,6 +50,8 @@ import { GLTFExporter } from './GLTFExporter.js';
 
 // const path_material = LineBasicMaterial( { color : 0xff0000 } );
 
+
+// SET UP THE SCENE, ADD CAMERA, LIGHT, GRID
 var clock = new Clock();
 const container = document.querySelector('#container');
 const scene = new Scene();
@@ -110,6 +112,9 @@ var travel_paths = new Group();
 var travel_vectors = new Array();
 var first_location = new Array();
 
+// LOAD THE IMAGE DATA FROM THE SERVER
+// AND CONVERT TO POINTS 
+
 window.onload = function () { 
   $.ajax({
     type: "GET",
@@ -156,16 +161,6 @@ window.onload = function () {
   });
 }
 
-
-// var target3 = new Mesh(boxGeometry, new MeshLambertMaterial({ color: 0x3399dd }));
-// target3.position.set(10, 137, -127.5);
-// target3.scale.set(0.1, 0.1, 0.1);
-// target3.transparent = true;
-// target3.opacity = 0.5;
-// target3.castShadow = true;
-// target3.receiveShadow = true;
-// scene.add(target3);
-
 scene.add(new HemisphereLight(0xffffff, 1.5));
 
 const renderer = new WebGLRenderer({ antialias: true, alpha: true });
@@ -209,6 +204,10 @@ dragControls.addEventListener('hoveroff', function () {
 });
 const material2 = new MeshPhongMaterial( { color: 0xff5533, specular: 0x111111, shininess: 200 } );
 
+
+
+// LOAD IN THE FULL GLTF ASSEMBLY AND RESTRUCTURE THE PART HIERARCHY 
+// TO MAINTAIN TRANSFORMATIONS 
 const gltfloader = new GLTFLoader();
 var base_group;
 var humerus;
@@ -373,7 +372,7 @@ gltfloader.load('./static/stl/arm.gltf',
     base_group.rotateZ(radians(-90));
   })
 
-
+// OLD CODE 
 // https://stackoverflow.com/questions/44899019/how-to-draw-form-circle-with-two-points
 function calculateRemainingPoint(points, x, precision, maxIteration) {
     if (x === void 0) { x = 0; };
@@ -417,6 +416,7 @@ var link = document.createElement( 'a' );
 link.style.display = 'none';
 document.body.appendChild( link ); // Firefox workaround, see #6594
 
+// Useful if you want to download the gltf blob
 function downloadJSON( blob, filename ) {
 
 	link.href = URL.createObjectURL( blob );
@@ -426,6 +426,7 @@ function downloadJSON( blob, filename ) {
 
 }
 
+// RESIZE THE WINDOW IF THE BROWSER IS RESIZED
 window.addEventListener('resize', onWindowResize, false);
 function onWindowResize() {
   camera.aspect = window.innerWidth / window.innerHeight;
@@ -470,6 +471,7 @@ function orthogonal(p){
 	return temp;
 }
 
+// quaternion to euler helper function
 function quatToEuler(q){
 	let phi1  = 2 * ((q.w * q.x) + (q.y * q.z));
     let phi2  = 1 - (2 * (q.x * q.x + q.y * q.y));
@@ -498,6 +500,7 @@ function radians (angle) {
   return angle * (Math.PI / 180);
 }
 
+// euler to quaternion helper function
 function radsToQuaternion(psi, theta, phi){
 	  let c3 = Math.cos(psi / 2);
     let s3 = Math.sin(psi / 2);
@@ -516,6 +519,7 @@ function radsToQuaternion(psi, theta, phi){
 
 // v1 --> Vector3
 // v2 --> Vector3
+// locate quaternion for two vectors
 function findQuatForVecs(v1, v2){ 
 	let v1_norm = v1.clone().normalize();
 	let v2_norm = v2.clone().normalize();
@@ -534,6 +538,7 @@ function findQuatForVecs(v1, v2){
 
 // p -> Vector3
 // q -> Quaternion
+// Used for testing
 function rotatePByQuat(p, q){
 	let q_norm  = q.clone().normalize();
 	let q_vec   = new Vector3(q_norm.x, q_norm.y, q_norm.z, 0);
@@ -550,6 +555,9 @@ function rotatePByQuat(p, q){
 	return new Vector3(rounded_x, rounded_y, rounded_z);
 }
 
+// Simple Arm class used to test kinematic systems (without using models)
+// Sample Arms can be created by grouping cubes (representing joints) together 
+// and defining the axes and angle limits per rotating joint. 
 class SimpleArm {
 	// nodes --> Array of Vec3
 	// edges --> Array of pair of int 
@@ -801,6 +809,7 @@ class SimpleArm {
 // target --> Vector3 
 // tolerance --> number
 // steps  --> int
+// Test CCDIK Iteration. OLD CODE
 function CCDIK(arm, target, tolerance, steps){ 
 	let ctr = 0;
 	let dist = distanceBetween(arm.getEndEffector(), target);
@@ -830,38 +839,17 @@ function CCDIK(arm, target, tolerance, steps){
 		ctr++;
 	}
 }
-// function maxDist(model){
-// 	let temp_pos = new Array();
-// 	let temp = new Vector3();
-// 	model[0].getWorldPosition(temp)
-// 	let base_length = temp.length();
-// 	let summ_dists = base_length;
-// 	model.forEach(e => {e.getWorldPosition(temp); temp_pos.push(temp);});
-
-// 	for (let i=0; i < model.length - 1; i++){
-// 		summ_dists += Math.abs(temp_pos[i].distanceTo(temp_pos[i+1]));
-// 	}
-// 	return summ_dists;
-// }
-
-	// if (target.length() > maxDist(model)){
-	// 	let lastJoint = model.slice(-2)[0];
-	// 	// just make sure the end effector is pointing towards
-	// 	// the target 
-	// 	lastJoint.lookAt(target);
-	// 	let invRot = lastJoint.quaternion.clone().inverse();
- //        let parentAxis = lastJoint.axis.clone().applyQuaternion(invRot);
- //        let fromToQuat = new Quaternion(0,0,0,1).setFromUnitVectors(lastJoint.axis, parentAxis);
- //        lastJoint.quaternion.multiply(fromToQuat);
- //        return;
-	// }
 
 const sleep = (milliseconds) => {
   return new Promise(resolve => setTimeout(resolve, milliseconds))
 }
+
 // Optimizations from https://github.com/mrdoob/three.js/blob/master/examples/jsm/animation/CCDIKSolver.js
 // 
 
+// Cyclic Coordinate Descent IK Solver for GLTF models 
+// taking in the model array, the angle limits, axes of rotation, and the target model
+// iterates backwards through the model 
 function CCDIKGLTF(model, anglelims, axes, target){
 	let tcp             = new Vector3();
 	let targetDirection = new Vector3();
@@ -878,31 +866,42 @@ function CCDIKGLTF(model, anglelims, axes, target){
 	for (let i = model.length - 2; i >= 0; i--){
 		// console.log(i);
 		let curr = model[i];
-        curr.updateMatrixWorld();
+    // update matrix as we are applying transformations
+    curr.updateMatrixWorld();
 
-        let curr_axis = axes[i];
-        let angles = anglelims[i];
+    let curr_axis = axes[i];
+    let angles = anglelims[i];
 
-        curr.matrixWorld.decompose(tcp, invQ, scale_junk);
-        invQ.inverse();
-        ee.setFromMatrixPosition(endEffector.matrixWorld);
+    // decompose the current 4x4 matrix into world position (Vector3), 
+    // quaternion rotation currently representing the object (Quaternion), 
+    // and scaling vector 
+    curr.matrixWorld.decompose(tcp, invQ, scale_junk);
 
-        endEffector.getWorldPosition(ee);
+    // invert the quaternion
+    invQ.inverse();
 
-        temp_ee.subVectors(ee, tcp);
-        temp_ee.applyQuaternion(invQ);
-        temp_ee.normalize();
+    // get the end effector world position
+    ee.setFromMatrixPosition(endEffector.matrixWorld);
+    endEffector.getWorldPosition(ee);
 
-        temp_target.subVectors(target, tcp);
-        temp_target.applyQuaternion(invQ);
-        temp_target.normalize();
+    // subtract the ee vector from the current joint vector, 
+    // apply the quaternion rotation, normalize the resultant vector
+    temp_ee.subVectors(ee, tcp);
+    temp_ee.applyQuaternion(invQ);
+    temp_ee.normalize();
 
-        let angle = temp_target.dot(temp_ee);
-        if ( angle > 1.0 ) {
-    			angle = 1.0;
-    		} else if ( angle < - 1.0 ) {
-    			angle = - 1.0;
-    		}
+    // do the same for the target
+    temp_target.subVectors(target, tcp);
+    temp_target.applyQuaternion(invQ);
+    temp_target.normalize();
+
+    // angle fixes and clamping 
+    let angle = temp_target.dot(temp_ee);
+    if ( angle > 1.0 ) {
+			angle = 1.0;
+		} else if ( angle < - 1.0 ) {
+			angle = - 1.0;
+		}
 
 		angle = Math.acos( angle );
 
@@ -915,39 +914,35 @@ function CCDIKGLTF(model, anglelims, axes, target){
 			angle = angles[1];
 		}
 
+
+    // grab normal vector of end effector to target
 		axis.crossVectors( temp_ee, temp_target );
 		axis.normalize();
 
+    // take the angle and axis from the above calculations to create a new 
+    // quaternion
 		q.setFromAxisAngle( axis, angle );
 		curr.quaternion.multiply( q );
 
+    // invert the quaternion and apply it to the previous joint's axis of rotation
+    // f(p) = qpq^-1
     let invRot = curr.quaternion.clone().inverse();
     let parentAxis = curr.axis.clone().applyQuaternion(invRot);
-    // console.log(parentAxis);
 
     let fromToQuat = new Quaternion(0,0,0,1).setFromUnitVectors(curr.axis, parentAxis);
     let eulercheck = new Euler().setFromQuaternion(fromToQuat);
-  //       let angle2 = Math.acos( curr_axis.dot(parentAxis));
-  //       if (curr_axis.toArray() === [1,0,0]){
-		// 	curr.rotateX(eulercheck.toArray()[0]);
-		// }
-		// else if (curr_axis.toArray() === [0,1,0]){
-		// 	curr.rotateY(eulercheck.toArray()[0]);
-		// }
-		// else {
-		// 	curr.rotateZ(eulercheck.toArray()[0]);
-		// }
 
+    //multiply the new quaternion to the current rotation quaternion of the link
     curr.quaternion.multiply(fromToQuat); 
-        // model[1].rotation.y = -Math.PI/2;
-		// model[1].rotation.z = 0;
-        // let clampedRot = curr.rotation.toVector3().clampScalar(radians(angles[0]), radians(angles[1]));
-        // curr.rotation.setFromVector3(clampedRot);
+    // clamp rotation code, currently not working (or stable)
+    // let clampedRot = curr.rotation.toVector3().clampScalar(radians(angles[0]), radians(angles[1]));
+    // curr.rotation.setFromVector3(clampedRot);
     curr.updateMatrixWorld();
         // console.log(curr.rotation);
 	}
 }
 
+// A single CCD passthrough for testing 
 function CCDSINGULAR(curr, endEffector, angles, curr_axis, target){
 	let tcp             = new Vector3();
 	let targetDirection = new Vector3();
@@ -1011,6 +1006,7 @@ function CCDSINGULAR(curr, endEffector, angles, curr_axis, target){
     // console.log(curr.rotation);
 }
 
+// a different CCD IK implementation but done through lookAt calls
 function LOOKATCCD(model, anglelims, axes, target){
 	let tcp = new Vector3();
 	let targetDirection = new Vector3();
@@ -1041,6 +1037,7 @@ function LOOKATCCD(model, anglelims, axes, target){
 	}
 }
 
+// Create the angles and axes of rotation for a robot
 var j1_angles = new Array(1, 179);
 var j1_axis   = new Vector3(0,0,1);
 var urj1_axis = new Vector3(0,1,0);
@@ -1074,36 +1071,9 @@ var fanuc_angles = new Array(j1_angles, j2_angles, j3_angles, j4_angles, j5_angl
 var fanuc_axes   = new Array(j1_axis, j2_axis, j3_axis, j4_axis, j5_axis);
 var fanuc_edges = new Array(new Array((0,1)),new Array((1,2)), new Array((2,3)), new Array((3,4)));
 var fanuc_sizes = new Array([.2,.2,.2], [.2, .2, .2], [.2, .2, .2], [.2, .2, .2], [.2, .2, .2]);
-// const test = new SimpleArm(fanuc_nodes, fanuc_edges, fanuc_angles, fanuc_axes, fanuc_sizes);
-
-// // TESTING distanceBetween 
-// console.log(distanceBetween(j1_axis, j2_axis));
-// console.log(distanceBetween(new Vector3(10,20,30), new Vector3(5,2,8)));
-// console.log(test.distances);
-
-// // TESTING checkDistance and updateDistances
-// console.log(test.checkDistances(new Array(179.88287927426558, 640, 116, 192, 256)));
-// test.updateDistances();
-
-// // TESTING maxDistance
-// console.log(test.maxDistance());
-
-// var j1_model;
-// fanuc_j1.getWorldPosition(j1_model);
-// var j2_model;
-// fanuc_j2.getWorldPosition(j2_model);
-// var j3_model;
-// fanuc_j3.getWorldPosition(j3_model);
-// var j4_model;
-// fanuc_j4.getWorldPosition(j4_model);
-// var j5_model;
-// fanuc_j5.getWorldPosition(j5_model);
-// var j6_model;
-// fanuc_j6.getWorldPosition(j6_model);
-
-
 
 // var fanuc_gltf_nodes = new Array(j1_model, j2_model, j3_model, j4_model, j5_mode, j6_model);
+// create readouts for euler angles
 var dialog_box_wrapper = document.createElement("div");
 dialog_box_wrapper.setAttribute("id", "data_wrapper");
 var euler_1_wrapper    = document.createElement("p");
@@ -1114,23 +1084,8 @@ dialog_box_wrapper.append(euler_1_wrapper);
 dialog_box_wrapper.append(euler_2_wrapper);
 document.body.appendChild(dialog_box_wrapper);
 
-function targetTravel (paths, target, delta) { 
-  target.userData.speed = 1;
-  target.position.set(first_location[0], first_location[1], first_location[2]);
-  if (paths) { 
-    for (let i = 0; i < paths.children.length; i ++){ 
-      let child = paths.children[i];
-      let positions = child.geometry.attributes["position"].array;
-      for (let j = 0; j < positions.length; j += 3) {
-        let new_vec = new Vector3( positions[j], positions[j + 1], positions[j + 2]);
-        let direction = new_vec.sub(target.position).normalize();
-        target.position.addScaledVector(direction, target.userData.speed);
-        target.rotateOnWorldAxis(new Vector3(0, 1, 0), radians(90));
-      }
-    }
-  }
-}
-
+// Code to run the path simulation (and IK sampling) 
+// after the whiteboard tool sends path data to the server
 function getNextTravelPoint(i, paths, target) { 
     let counts = paths.map(x => x.length);
     let temp = 0;
@@ -1176,6 +1131,10 @@ function getNextTravelPoint(i, paths, target) {
 // Animate the target to the path
 // solve IK, convert rotation to servo angles, send to server
 
+
+//  Animate runs after every frame refresh, so we need to check a couple things 
+//  and make sure they are defined before computing IK or running the path simulation 
+//  (due to async calls)
 var check = false;
 var robot;
 var angles_ = {};
