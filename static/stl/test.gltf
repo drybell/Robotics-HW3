@@ -1,0 +1,124 @@
+{
+	"asset": {
+		"generator": "VISUALIZEGLTF",
+		"version" : "2.0"
+	},
+	"scenes": [
+		{
+			"name": "Default",
+			"nodes": [
+				0]
+		}
+	],
+	"nodes": [
+		{
+			"children": [
+				1
+			]
+			,"name": "Root"		}
+,
+		{
+			"mesh": 0
+			,"name": "color"		}
+	],
+	"meshes" : [
+		{
+			"primitives" : [
+				{
+					"attributes" : {
+					"POSITION" : 1
+					,"NORMAL" : 2
+					,"TEXCOORD_0" : 3
+					},
+					"indices" : 0,
+					"mode": 4,
+					"material" : 0
+				}
+			]
+		}
+	],
+	"accessors" : [
+			{
+				"bufferView": 3,
+				"byteOffset" : 0,
+				"componentType" : 5125,
+				"count" : 63558,
+				"type" : "SCALAR"
+			},
+			{
+				"bufferView": 0,
+				"byteOffset" : 0,
+				"componentType" : 5126,
+				"count" : 28576,
+				"type" : "VEC3"
+								,"min": [-0.0299999993,0,-0.0216273833]
+								,"max": [0.234099999,0.117250003,0.0250976067]
+			},
+			{
+				"bufferView": 1,
+				"byteOffset" : 0,
+				"componentType" : 5126,
+				"count" : 28576,
+				"type" : "VEC3"
+			},
+			{
+				"bufferView": 2,
+				"byteOffset" : 0,
+				"componentType" : 5126,
+				"count" : 28576,
+				"type" : "VEC2"
+			}
+	],
+	"materials": [
+			{
+				"name": "color",
+				"emissiveFactor": [
+					0, 0, 0
+				]
+				,"pbrMetallicRoughness": {
+					"baseColorFactor": [
+						0.6064497, 0.6537905, 0.870804, 1
+					]
+					,"metallicFactor": 0.08936077
+					,"roughnessFactor": 0.01336535
+				}
+				,"alphaMode": "OPAQUE"
+				,"doubleSided": true
+			}
+	],
+	"bufferViews" : [
+			{
+				"buffer": 0
+				,"byteOffset" : 0
+				,"byteLength" : 342912
+				,"byteStride" : 12
+				,"target" : 34962
+			},
+			{
+				"buffer": 0
+				,"byteOffset" : 342912
+				,"byteLength" : 342912
+				,"byteStride" : 12
+				,"target" : 34962
+			},
+			{
+				"buffer": 0
+				,"byteOffset" : 685824
+				,"byteLength" : 228608
+				,"byteStride" : 8
+				,"target" : 34962
+			},
+			{
+				"buffer": 0
+				,"byteOffset" : 914432
+				,"byteLength" : 254232
+				,"target" : 34963
+			}
+	],
+	"buffers" : [
+			{
+				"byteLength": 1168664
+				,"uri" : "test_0001.bin"
+			}
+	]
+}

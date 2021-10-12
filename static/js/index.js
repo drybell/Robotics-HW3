@@ -5,10 +5,14 @@
 import {
   BoxBufferGeometry,
   BufferGeometry,
+  Float32BufferAttribute,
   Color,
   Mesh,
+  Clock,
+  Points,
   MeshBasicMaterial,
   PerspectiveCamera,
+  PointsMaterial,
   Scene,
   WebGLRenderer,
   HemisphereLight,
@@ -17,6 +21,7 @@ import {
   Quaternion,
   Euler,
   PlaneBufferGeometry,
+  MeshPhysicalMaterial,
   DirectionalLight,
   MeshPhongMaterial,
   GridHelper,
@@ -39,7 +44,13 @@ import { STLLoader } from './STLLoader.module.js';
 import { GLTFLoader } from './GLTFLoader.js';
 import { GLTFExporter } from './GLTFExporter.js';
 // import { ImageLoader } from './ImageLoader.js';
- 
+
+
+// const curve = new SplineCurve();
+
+// const path_material = LineBasicMaterial( { color : 0xff0000 } );
+
+var clock = new Clock();
 const container = document.querySelector('#container');
 const scene = new Scene();
 
@@ -54,7 +65,7 @@ const far = 3500; // the far clipping plane
 
 const camera = new PerspectiveCamera(fov, aspect, near, far);
 var draggableObjects = new Array();
-camera.position.set(1400, 300, 900);
+camera.position.set(650, 300, 0);
 // camera.position.set(1400, 700, -1000);
 
 // const geometry = new BoxBufferGeometry(2, 2, 2);
@@ -71,7 +82,7 @@ light.shadow.camera.left = - 120;
 light.shadow.camera.right = 120;
 scene.add(light);
 
-const axesHelper = new AxesHelper( 5 );
+const axesHelper = new AxesHelper( 10 );
 scene.add( axesHelper );
 
 var mesh2 = new Mesh(new PlaneBufferGeometry(2000, 2000), new MeshPhongMaterial({ color: 0x999999, depthWrite: false }));
@@ -84,7 +95,7 @@ grid.material.transparent = true;
 scene.add(grid);
 
 var target2 = new Mesh(boxGeometry, new MeshLambertMaterial({ color: 0x3399dd }));
-target2.position.set(100, 50, 0);
+// target2.position.set(150, 0, 80);
 target2.scale.set(0.05, 0.05, 0.05);
 target2.transparent = true;
 target2.opacity = 0.5;
@@ -92,7 +103,59 @@ target2.castShadow = true;
 target2.receiveShadow = true;
 scene.add(target2);
 draggableObjects.push(target2);
-camera.lookAt(target2.position);
+camera.lookAt(new Vector3(0,0,0));
+
+var all_paths;
+var travel_paths = new Group();
+var travel_vectors = new Array();
+var first_location = new Array();
+
+window.onload = function () { 
+  $.ajax({
+    type: "GET",
+    url: "/image",
+  }).success(function(e) {
+      let target_coords = e.coords;
+      const mat = new PointsMaterial( { color : 0xff0000 } );
+      let thresh = 3.9;
+      let y_offset = 145;
+      let x_offset = -110;
+      scene.add(travel_paths);
+      console.log(target_coords);
+      for (let i = 0; i < target_coords.length; i ++ ) { 
+        let temp = new Array();
+        for (let j = 0; j < target_coords[i].length - 1; j += 2) { 
+          // temp.push(new Vector3( target_coords[i][j], 0, target_coords[i][j + 1] ));
+          let x = (target_coords[i][j] / thresh) + x_offset;
+          let y = (target_coords[i][j + 1] / thresh) + y_offset;
+          temp.push( y, 0, -1 * x);
+        }
+        // const line_geo = new BufferGeometry().setFromPoints( temp );
+        const line_geo = new BufferGeometry();
+        line_geo.setAttribute( 'position', new Float32BufferAttribute( temp, 3 ) );
+        const temp_point = new Points( line_geo, mat );
+        // temp_point.rotateY(radians(90));
+        travel_paths.add(temp_point);
+        // const travel_path = new Line(line_geo, mat);
+        // travel_path.rotateY(-90);
+        temp_point.geometry.attributes["position"];
+      }
+      scene.add(travel_paths);
+      let temp_array = travel_paths.children[0].geometry.attributes["position"].array;
+      first_location = temp_array.slice(0, 3);
+      console.log(travel_paths);
+      let coords_list = travel_paths.children.map( j => j.geometry.attributes["position"].array);
+      for (let j = 0; j < coords_list.length; j ++) { 
+        let temp = new Array();
+        let curr_path = coords_list[j];
+        for (let i = 0; i < curr_path.length; i += 3) {
+          temp.push(new Vector3(curr_path[i], curr_path[i + 1], curr_path[i + 2]));
+        }
+        travel_vectors.push(temp);
+      }
+  });
+}
+
 
 // var target3 = new Mesh(boxGeometry, new MeshLambertMaterial({ color: 0x3399dd }));
 // target3.position.set(10, 137, -127.5);
@@ -146,225 +209,170 @@ dragControls.addEventListener('hoveroff', function () {
 });
 const material2 = new MeshPhongMaterial( { color: 0xff5533, specular: 0x111111, shininess: 200 } );
 
-// // https://stackoverflow.com/questions/23385623/three-js-proper-way-to-add-and-remove-child-objects-using-three-sceneutils-atta
-// function reparentObject3D(subject, newParent)
-// {
-//     subject.matrix.copy(subject.matrixWorld);
-//     subject.applyMatrix4(new Matrix4().getInverse(newParent.matrixWorld));
-//     // subject.matrixAutoUpdate = false;
-//     newParent.add(subject);
-// }
+const gltfloader = new GLTFLoader();
+var base_group;
+var humerus;
+var servo_group;
+var linear_servo_group;
+var sm_servo;
+var end_effector_arm;
+var ee_; 
+var pen;
+var servo_hat;
+var sm_servo_4;
 
-// function reparentwithTarget(subject, target, newParent)
-// {
-//     subject.matrix.copy(target);
-//     subject.applyMatrix4(new Matrix4().getInverse(newParent.matrixWorld));
-//     // subject.matrixAutoUpdate = false;
-//     newParent.add(subject);
-// }
+// servo_hat, sm_servo_4, pen
 
-// const imageloader = new THREE.ImageLoader();
+gltfloader.load('./static/stl/arm.gltf',
+  function ( gltf ) { 
+    console.log(gltf.scene);
+    let robot = gltf.scene;
+    let full_robot = robot.clone().children[0];
+    let robot_gltf = robot.clone(false);
+    full_robot.children = [];
 
-// // load a image resource
-// imageloader.load(
-// 	// resource URL
-// 	'./static/png/out.png',
+    let children_copy = robot.clone().children[0].children; 
 
-// 	// onLoad callback
-// 	function ( image ) {
-// 		// use the image, e.g. draw part of it on a canvas
-// 		const image_canvas = document.createElement( 'image-canvas' );
-// 		const context = image_canvas.getContext( '2d' );
-// 		context.drawImage( image, 100, 100 );
-// 	},
+    let base_0 = children_copy.find(obj => {
+      return obj.name === "occurrence_of_Base_Bot";
+    });
 
-// 	// onProgress callback currently not supported
-// 	undefined,
+    let base_1 = children_copy.find(obj => { 
+      return obj.name === "occurrence_of_Base_Top";
+    });
 
-// 	// onError callback
-// 	function () {
-// 		console.error( 'An error happened.' );
-// 	}
-// );
+    base_group = new Group();
+    base_group.add(base_0);
+    base_group.add(base_1);
 
-// // Create a texture loader so we can load our image file
-// var loader = new THREE.TextureLoader();
+    let servo_base = children_copy.find(obj => {
+      return obj.name === "occurrence_of_Servo_Bot";
+    });
 
-// // Load an image file into a custom material
-// var material = new THREE.MeshLambertMaterial({
-//   map: loader.load('https://s3.amazonaws.com/duhaime/blog/tsne-webgl/assets/cat.jpg')
-// });
+    let servo_1 = children_copy.find(obj => {
+      return obj.name === "occurrence_of_Servo_Mid";
+    });
 
-// // create a plane geometry for the image with a width of 10
-// // and a height that preserves the image's aspect ratio
-// var geometry = new THREE.PlaneGeometry(10, 10*.75);
+    let servo_2 = children_copy.find(obj => {
+      return obj.name === "occurrence_of_Servo_Top";
+    });
 
-// // combine our image geometry and material into a mesh
-// var mesh = new THREE.Mesh(geometry, material);
+    let servo_3 = children_copy.find(obj => {
+      return obj.name === "occurrence_of_Servo_Gear";
+    });
 
-// // set the position of the image mesh in the x,y,z dimensions
-// mesh.position.set(0,0,0)
+    servo_hat = children_copy.find(obj => {
+      return obj.name === "occurrence_of_Servo_Horn";
+    });
 
-// // add the image to the scene
-// scene.add(mesh);
+    servo_group = new Group();
+    servo_group.add(servo_base);
+    servo_group.add(servo_1);
+    servo_group.add(servo_2);
+    servo_group.add(servo_3);
 
-// instantiate a loader
-// const texture_loader = new TextureLoader();
+    humerus = children_copy.find(obj => {
+      return obj.name === "occurrence_of_Humerus";
+    });
 
-// // load a resource
-// texture_loader.load(
-// 	// resource URL
-// 	'./static/png/out.png',
+    let small_servo = children_copy.find(obj => {
+      return obj.name === "occurrence_of_BottomBody";
+    });
 
-// 	// onLoad callback
-// 	function ( texture ) {
-// 		// in this example we create the material when the texture is loaded
-// 		// create a plane geometry for the image with a width of 10
-// 		// and a height that preserves the image's aspect ratio
-// 		// 1573 x 945 = 
-// 		let geometry = new PlaneGeometry(500, 500*.60076);
+    let sm_servo_1 = children_copy.find(obj => {
+      return obj.name === "occurrence_of_MiddleBody";
+    });
 
-// 		// combine our image geometry and material into a mesh
-// 		let mesh = new Mesh(geometry, material);
-// 		scene.add(mesh);
-// 	},
+    let sm_servo_2 = children_copy.find(obj => {
+      return obj.name === "occurrence_of_UpperBody";
+    });
 
-// 	// onProgress callback currently not supported
-// 	undefined,
+    let sm_servo_3 = children_copy.find(obj => {
+      return obj.name === "occurrence_of_Small_Mid_Gear";
+    });
 
-// 	// onError callback
-// 	function ( err ) {
-// 		console.error( 'An error happened.' );
-// 	}
-// );
+    sm_servo_4 = children_copy.find(obj => {
+      return obj.name === "occurrence_of_GearTop";
+    });
 
-const image_loader = new TextureLoader();
+    sm_servo = new Group();
+    sm_servo.add(small_servo);
+    sm_servo.add(sm_servo_1);
+    sm_servo.add(sm_servo_2);
+    sm_servo.add(sm_servo_3);
+    sm_servo.add(sm_servo_4);
 
-var plane_mat = new MeshLambertMaterial({
-  map: image_loader.load('./static/png/out.png')
-});
+    end_effector_arm = children_copy.find(obj => {
+      return obj.name === "occurrence_of_Forearm";
+    });
 
-var plane_geometry = new PlaneGeometry(6500, 6500*.60076);
-var plane_mesh = new Mesh(plane_geometry, plane_mat);
-scene.add(plane_mesh);
-plane_mesh.position.z = -1000;
-plane_mesh.position.x = -1400;
-plane_mesh.rotateX(-Math.PI/2);
+    let linear_servo = children_copy.find(obj => {
+      return obj.name === "occurrence_of_Linear_Plate";
+    });
 
-var geo = new Mesh
+    let linear_servo1 = children_copy.find(obj => {
+      return obj.name === "occurrence_of_Linear_Cyl";
+    });
 
-const fanucloader = new GLTFLoader();
-var fanuc_gltf;
-var fanuc_j1;
-var fanuc_j2;
-var fanuc_j3;
-var fanuc_j4;
-var fanuc_j5;
-var fanuc_j6;
-var base;
-var fanuc_anim;
-fanucloader.load(
-	// resource URL
-	'./static/gltf/Full FANUC.gltf',
-	// called when the resource is loaded
-	// FWIW, what I was guessing was your 
-	// question is doable by setting object.matrix to be the product 
-	// of (1) the inverse of parent.matrixWorld and (2) your desired matrix. 
-	// – WestLangley
-	function ( gltf ) {
+    let linear_servo2 = children_copy.find(obj => {
+      return obj.name === "occurrence_of_Linear_Shaft";
+    });
 
-		// scene.add( gltf.scene );
-		console.log(gltf.scene);
-		// gltf.animations; // Array<THREE.AnimationClip>
-		// gltf.scene; // THREE.Group
-		// gltf.scenes; // Array<THREE.Group>
-		// gltf.cameras; // Array<THREE.Camera>
-		// gltf.asset; // Object
+    let linear_servo3 = children_copy.find(obj => {
+      return obj.name === "occurrence_of_Linear_Gear";
+    });
 
-		// let fanuc_j2_original = new Group();
+    linear_servo_group = new Group();
+    linear_servo_group.add(linear_servo);
+    linear_servo_group.add(linear_servo1);
+    linear_servo_group.add(linear_servo2);
+    linear_servo_group.add(linear_servo3);
 
-		let fanuc = gltf.scene;
-		let full_fanuc = fanuc.clone().children[0];
-		fanuc_gltf = gltf.scene.clone(false);
-		full_fanuc.children = [];
-		let children = fanuc.clone().children[0].children;
-		for (let i=0; i < children.length; i++){
-			switch (children[i].name){
-				case "occurrence_of_BaseJ1":
-					base = children[i];
-					break;
-				case "occurrence_of_J1J2":
-					fanuc_j1 = children[i];
-					break;
-				case "occurrence_of_J2J3":
-					// fanuc_j2_original = children[i];
-					// fanuc_j2_original.rotateY(radians(90));
-					fanuc_j2 = children[i];
-					break;
-				case "occurrence_of_J3J4":
-					fanuc_j3 = children[i];
-					break;
-				case "occurrence_of_J4J5":
-					fanuc_j4 = children[i];
-					break;
-				case "occurrence_of_J5J6":
-					fanuc_j5 = children[i];
-					break;
-				case "occurrence_of_J6End":
-					fanuc_j6 = children[i];
-					break;
-			}
-		}
-		let j1axis = new AxesHelper( .50 );
-		let j2axis = new AxesHelper( .20 );
-		let j3axis = new AxesHelper( .20 );
-		let j4axis = new AxesHelper( .20 );
-		let j5axis = new AxesHelper( .20 );
-		let j6axis = new AxesHelper( .20 );
-		// let j2axisstatic = new AxesHelper( .20 );
-		console.log(children);
-		scene.attach(fanuc_gltf);
-		fanuc_gltf.attach(full_fanuc);
-		full_fanuc.attach(base);
-		// fanuc_j1.rotation.x = radians(90);
-		// fanuc_j1.rotation.z = radians(-105);
-		base.attach(fanuc_j1);
-		fanuc_j1.add(j1axis);
-		// fanuc_j2.rotation.y = radians(18-);
-		// fanuc_j2.rotation.y = Math.PI/2;
-		// fanuc_j2.rotateY(Math.PI/2);
-		fanuc_j1.attach(fanuc_j2);
-		fanuc_j1.add(j1axis);
-		fanuc_j2.attach(fanuc_j3);
-		fanuc_j2.add(j2axis);
-		// fanuc_j2.attach(j2axisstatic);
-		fanuc_j3.attach(fanuc_j4);
-		fanuc_j3.add(j3axis);
-		fanuc_j4.attach(fanuc_j5);
-		fanuc_j4.add(j4axis);
-		fanuc_j5.attach(fanuc_j6);
-		fanuc_j5.add(j5axis);
+    ee_ = children_copy.find(obj => {
+      return obj.name === "occurrence_of_EE_Back";
+    });
 
-		
-		fanuc_gltf.scale.set(100, 100, 100);
-		fanuc_gltf.rotation.set(- Math.PI/2, 0, Math.PI/2);
-		fanuc_gltf.position.set(-220, 0, 100);
-		
-		console.log(fanuc_gltf);
-	},
-	// called while loading is progressing
-	function ( xhr ) {
+    let ee_1 = children_copy.find(obj => {
+      return obj.name === "occurrence_of_EE_Front";
+    });
 
-		console.log( ( xhr.loaded / xhr.total * 100 ) + '% loaded' );
+    const ee = new Group();
+    ee.add(ee_);
+    ee.add(ee_1);
 
-	},
-	// called when loading has errors
-	function ( error ) {
+    pen = children_copy.find(obj => {
+      return obj.name === "occurrence_of_Sharpie";
+    });
 
-		console.log( error );
+    // let j1axis = new AxesHelper( 10 );
+    // let j2axis = new AxesHelper( 10 );
+    // let j3axis = new AxesHelper( 10 );
 
-	}
-);
+    servo_hat.rotateY(radians(180));
+    servo_hat.rotateZ(radians(59));
+
+    scene.attach(robot_gltf);
+    robot_gltf.add(full_robot);
+    full_robot.attach(base_group);
+    base_0.attach(servo_group);
+    servo_3.attach(servo_hat);
+    servo_hat.attach(humerus);
+    // servo_hat.add(j1axis);
+    humerus.attach(sm_servo);
+    sm_servo_4.attach(end_effector_arm);
+    // sm_servo_4.add(j2axis);
+    end_effector_arm.attach(ee);
+    ee_.attach(linear_servo_group);
+    ee_.attach(pen);
+    // pen.add(j3axis);
+
+    console.log(full_robot);
+
+    base_group.scale.set(1000, 1000, 1000);
+    base_group.rotateX(radians(-90));
+    base_group.rotateZ(radians(-90));
+  })
+
 
 // https://stackoverflow.com/questions/44899019/how-to-draw-form-circle-with-two-points
 function calculateRemainingPoint(points, x, precision, maxIteration) {
@@ -405,235 +413,6 @@ function distance(x1, y1, x2, y2) {
     return Math.sqrt(a * a + b * b);
 }
 
-var test_point1 = new Vector2(10, 10);
-var test_point2 = new Vector2(2, -7);
-var center = calculateRemainingPoint([test_point1, test_point2]);
-console.log(center);
-console.log(distance(center.x, center.y, test_point1.x, test_point1.y));
-console.log(distance(center.x, center.y, test_point2.x, test_point2.y))
-
-
-class MIR{
-
-	constructor(robot, path, resolution, tolerance, velocity) {
-		if ( resolution === void 0 ) resolution = 1000;
-		if ( tolerance === void 0 ) tolerance = .1;
-		if ( velocity === void 0) velocity = 5;
-		this.robot   = robot;
-		this.path    = path; 
-		this.running = false; 
-		// z component of its current orientation
-		this.orientation = new Vector3(0,0,1);
-		this.resolution  = resolution;
-		this.tolerance   = tolerance;
-		this.axis        = new Vector3(0,1,0);
-		this.acceleration = null;
-		this.velocity     = velocity;
-		this.steps        = 0;
-		// this.home         = robot.getWorldPosition();
-		this.home_orientation = robot.quaternion.clone();
-		this.increment = 1;
-
-		// this.path  = new THREE.CatmullRomCurve3();
-	}
-
-	// calculateCircle(target, curr_pos) { 
-	// 	let mir_pos = curr_pos.clone();
-	// 	let tar_pos = target.clone();
-	// 	let mir_pos2 = new Vector2(mir_pos.x, mir_pos.z);
-	// 	let tar_pos2 = new Vector2(tar_pos.x, tar_pos.z);
-	// 	let temp = [mir_pos2, tar_pos2];
-	// 	let c = calculateRemainingPoint(temp);
-
-	// 	// get angles to only keep arc
-	// 	let mir_angle = mir_pos2.angle();
-	// 	let tar_angle = tar_pos2.angle();
-
-	// 	let circle = new EllipseCurve(c.x, c.y, c.r, c.r, tar_angle, mir_angle);
-	// 	let points = circle.getPoints( this.resolution );
-	// 	let g = new BufferGeometry().setFromPoints( points );
-
-	// 	let m = new LineBasicMaterial( { color : 0xff0000 } );
-
-	// 	// Create the final object to add to the scene
-	// 	this.path = new Line( g, m );
-	// 	scene.add(this.path);
-	// 	this.path.rotateX(Math.PI/2);
-	// }
-
-	// move MIR back and forth along path
-	handleMIR(target){
-		// let target_world = new Vector3();
-		// let mir_world    = new Vector3();
-		// // let circle       = new CatmullRomCurve3();
-		// let points       = new Array();
-
-		// target.getWorldPosition(target_world);
-		// this.robot.getWorldPosition(mir_world);
-
-		// let distance = distanceBetween(target_world, mir_world);
-
-
-		// if (this.running && distance <= this.tolerance) { 
-		// 	this.running = false;
-		// 	this.path.geometry.dispose();
-		// 	this.path.material.dispose();
-		// 	scene.remove( this.path );
-		// 	this.path    = null;
-		// }
-		// else if (this.running && this.path !== null) { 
-		// 	moveMIR();
-		// }
-		// else if (!this.running && distance > this.tolerance){ 
-		// 	this.running = true;
-		// 	// this.calculateCircle(target_world, mir_world);
-		// 	this.steps = 0;
-		// 	moveMIR();
-		// }
-	}	
-
-	moveMIR(){
-		//Then at each increment (in your render loop or in the 'update' function of a tween)
-		if (this.steps >= this.path.length - (this.velocity * 2) - 1) { 
-			this.increment = -1;
-		}
-		else if (this.steps <= (2 * this.velocity) + 1){
-			this.increment = 1;
-		}
-		let new_pos = this.velocity * this.increment;
-
-		let newPosition = this.path[this.steps];
-		this.robot.position.copy( newPosition );
-
-		//Also update the car's orientation so it looks at the road
-		let target = this.path[this.steps + new_pos];
-		this.robot.lookAt( target );//+.001 or whatever
-
-		this.steps = this.steps + new_pos;
-	}	
-}
-
-class FANUC extends Group { 
-
-	constructor(robot, angles, axes, tolerance) { 
-
-	}
-}
-
-// Create a sine-like wave
-// const curve = new THREE.SplineCurve( [
-// 	new THREE.Vector2( -10, 0 ),
-// 	new THREE.Vector2( -5, 5 ),
-// 	new THREE.Vector2( 0, 0 ),
-// 	new THREE.Vector2( 5, -5 ),
-// 	new THREE.Vector2( 10, 0 )
-// ] );
-
-// const points = curve.getPoints( 50 );
-// const geometry = new THREE.BufferGeometry().setFromPoints( points );
-
-// const material = new THREE.LineBasicMaterial( { color : 0xff0000 } );
-
-// // Create the final object to add to the scene
-// const splineObject = new THREE.Line( geometry, material );
-
-//Create a closed wavey loop
-// const curve = new THREE.CatmullRomCurve3( [
-// 	new THREE.Vector3( -10, 0, 10 ),
-// 	new THREE.Vector3( -5, 5, 5 ),
-// 	new THREE.Vector3( 0, 0, 0 ),
-// 	new THREE.Vector3( 5, -5, 5 ),
-// 	new THREE.Vector3( 10, 0, 10 )
-// ] );
-
-// const points = curve.getPoints( 50 );
-// const geometry = new THREE.BufferGeometry().setFromPoints( points );
-
-// const material = new THREE.LineBasicMaterial( { color : 0xff0000 } );
-
-// // Create the final object to add to the scene
-// const curveObject = new THREE.Line( geometry, material );
-
-// calculate the bounding circle in the xz plane
-// where the target is on the circle and the mir's
-// current vector is on the circle
-// Give MIR an acceleration and a velocity
-
-// //1. create spline's points
-// var points = [
-//     new THREE.Vector3( x1, y1, z1 ),
-//     new THREE.Vector3( x2, y2, z2 ),
-//     ...
-//     new THREE.Vector3( xn, yn, zn )
-//     ];
-
-// //2. create spline
-// var spline = new THREE.CatmullRomCurve3( points );
-// //since r72. Before : THREE.SplineCurve3
-
-// //3. define the car position on the spline, between its start (0) and end (1)
-// var carPositionOnSpline = 0;
-
-// //Then at each increment (in your render loop or in the 'update' function of a tween)
-// var newPosition = spline.getPoint( carPositionOnSpline );
-// car.position.copy( newPosition );
-
-// //Also update the car's orientation so it looks at the road
-// var target = spline.getPoint( carPositionOnSpline + .001 );
-// car.lookAt( target );//+.001 or whatever
-// var actualOrientation = new THREE.Vector3().subVectors( target, newPosition );
-// actualOrientation.normalize();
-
-// var orientation=new THREE.Vector3().crossVectors( actualOrientation, previousOrientation );
-
-// wheel.rotation.y = something * orientation.y;
-
-// previousOrientation = actualOrientation;
-
-// const mir_loader = new GLTFLoader();
-// var mir;
-// mir_loader.load(
-// 	// resource URL
-// 	'./static/gltf/MIRCOARSE.gltf',
-// 	// called when the resource is loaded
-// 	// FWIW, what I was guessing was your 
-// 	// question is doable by setting object.matrix to be the product 
-// 	// of (1) the inverse of parent.matrixWorld and (2) your desired matrix. 
-// 	// – WestLangley
-// 	function ( gltf ) {
-
-// 		// scene.add( gltf.scene );
-// 		// gltf.animations; // Array<THREE.AnimationClip>
-// 		// gltf.scene; // THREE.Group
-// 		// gltf.scenes; // Array<THREE.Group>
-// 		// gltf.cameras; // Array<THREE.Camera>
-// 		// gltf.asset; // Object
-
-// 		// let fanuc_j2_original = new Group();
-// 		let j1axis = new AxesHelper( .50 );
-// 		mir = gltf.scene;
-// 		scene.add(mir);
-// 		mir.add(j1axis);
-// 		mir.position.set(800,0,290);
-// 		mir.scale.set(100,100,100);
-// 		mir.rotateY(radians(-155));
-		
-// 		console.log(mir);
-// 	},
-// 	// called while loading is progressing
-// 	function ( xhr ) {
-
-// 		console.log( ( xhr.loaded / xhr.total * 100 ) + '% loaded' );
-
-// 	},
-// 	// called when loading has errors
-// 	function ( error ) {
-
-// 		console.log( error );
-
-// 	}
-// );
-
 var link = document.createElement( 'a' );
 link.style.display = 'none';
 document.body.appendChild( link ); // Firefox workaround, see #6594
@@ -646,100 +425,6 @@ function downloadJSON( blob, filename ) {
 	// URL.revokeObjectURL( url ); breaks Firefox...
 
 }
-
-// const urloader = new GLTFLoader();
-// var ur_gltf;
-// var urbase;
-// var urj1;
-// var urj2;
-// var urj3;
-// var urj4;
-// var urj5;
-// var urj6;
-// // './static/gltf/UR3e_med.gltf'
-// urloader.load(
-// 	// resource URL
-// 	'./static/gltf/ur3_small.gltf',
-// 	// called when the resource is loaded
-// 	function ( gltf ) {
-
-// 		console.log(gltf.scene);
-// 		// gltf.animations; // Array<THREE.AnimationClip>
-// 		// gltf.scene; // THREE.Group
-// 		// gltf.scenes; // Array<THREE.Group>
-// 		// gltf.cameras; // Array<THREE.Camera>
-// 		// gltf.asset; // Object
-// 		let ur3 = gltf.scene;
-// 		let full_ur3 = ur3.clone().children[0];
-// 		ur_gltf = gltf.scene.clone(false);
-// 		full_ur3.children = [];
-// 		let children = ur3.clone().children[0].children;
-// 		console.log(children);
-// 		for (let i=0; i < children.length; i++){
-// 			switch (children[i].name){
-// 				case "occurrence_of_Base":
-// 					urbase = children[i];
-// 					break;
-// 				case "occurrence_of_Shoulder":
-// 					urj1 = children[i];
-// 					break;
-// 				case "occurrence_of_Elbow":
-// 					urj2 = children[i];
-// 					break;
-// 				case "occurrence_of_Wrist_1":
-// 					urj3 = children[i];
-// 					break;
-// 				case "occurrence_of_Wrist_2":
-// 					urj4 = children[i];
-// 					break;
-// 				case "occurrence_of_Wrist_3":
-// 					urj5 = children[i];
-// 					break;
-// 				case "occurrence_of_Tool_flange":
-// 					urj6 = children[i];
-// 					break;
-// 			}
-// 		}
-// 		// let	j1axis = new AxesHelper( .20 );
-// 		// let j2axis = new AxesHelper( .20 );
-// 		// let j3axis = new AxesHelper( .20 );
-// 		// let j4axis = new AxesHelper( .20 );
-// 		// let j5axis = new AxesHelper( .20 );
-// 		// let j6axis = new AxesHelper( .20 );
-// 		scene.add(ur_gltf);
-// 		ur_gltf.attach(full_ur3);
-// 		full_ur3.attach(urbase);
-// 		urbase.attach(urj1);
-// 		urj1.attach(urj2);
-// 		// urj1.add(j1axis);
-// 		urj2.attach(urj3);
-// 		// urj2.add(j2axis);
-// 		urj3.attach(urj4);
-// 		// urj3.add(j3axis);
-// 		urj4.attach(urj5);
-// 		// urj4.add(j4axis);
-// 		urj5.attach(urj6);
-// 		// urj5.add(j5axis);
-
-// 		ur_gltf.scale.set(100, 100, 100);
-// 		ur_gltf.position.set(595,80,415);
-// 		ur_gltf.rotateY(Math.PI);
-
-// 		console.log(ur_gltf);
-// 	},
-// 	// called while loading is progressing
-// 	function ( xhr ) {
-
-// 		console.log( ( xhr.loaded / xhr.total * 100 ) + '% loaded' );
-
-// 	},
-// 	// called when loading has errors
-// 	function ( error ) {
-
-// 		console.log( error );
-
-// 	}
-// );
 
 window.addEventListener('resize', onWindowResize, false);
 function onWindowResize() {
@@ -814,7 +499,7 @@ function radians (angle) {
 }
 
 function radsToQuaternion(psi, theta, phi){
-	let c3 = Math.cos(psi / 2);
+	  let c3 = Math.cos(psi / 2);
     let s3 = Math.sin(psi / 2);
     let c2 = Math.cos(theta / 2);
     let s2 = Math.sin(theta / 2);
@@ -1214,10 +899,10 @@ function CCDIKGLTF(model, anglelims, axes, target){
 
         let angle = temp_target.dot(temp_ee);
         if ( angle > 1.0 ) {
-			angle = 1.0;
-		} else if ( angle < - 1.0 ) {
-			angle = - 1.0;
-		}
+    			angle = 1.0;
+    		} else if ( angle < - 1.0 ) {
+    			angle = - 1.0;
+    		}
 
 		angle = Math.acos( angle );
 
@@ -1236,12 +921,12 @@ function CCDIKGLTF(model, anglelims, axes, target){
 		q.setFromAxisAngle( axis, angle );
 		curr.quaternion.multiply( q );
 
-        let invRot = curr.quaternion.clone().inverse();
-        let parentAxis = curr.axis.clone().applyQuaternion(invRot);
-        // console.log(parentAxis);
+    let invRot = curr.quaternion.clone().inverse();
+    let parentAxis = curr.axis.clone().applyQuaternion(invRot);
+    // console.log(parentAxis);
 
-        let fromToQuat = new Quaternion(0,0,0,1).setFromUnitVectors(curr.axis, parentAxis);
-        let eulercheck = new Euler().setFromQuaternion(fromToQuat);
+    let fromToQuat = new Quaternion(0,0,0,1).setFromUnitVectors(curr.axis, parentAxis);
+    let eulercheck = new Euler().setFromQuaternion(fromToQuat);
   //       let angle2 = Math.acos( curr_axis.dot(parentAxis));
   //       if (curr_axis.toArray() === [1,0,0]){
 		// 	curr.rotateX(eulercheck.toArray()[0]);
@@ -1253,12 +938,12 @@ function CCDIKGLTF(model, anglelims, axes, target){
 		// 	curr.rotateZ(eulercheck.toArray()[0]);
 		// }
 
-        curr.quaternion.multiply(fromToQuat); 
+    curr.quaternion.multiply(fromToQuat); 
         // model[1].rotation.y = -Math.PI/2;
 		// model[1].rotation.z = 0;
         // let clampedRot = curr.rotation.toVector3().clampScalar(radians(angles[0]), radians(angles[1]));
         // curr.rotation.setFromVector3(clampedRot);
-        curr.updateMatrixWorld();
+    curr.updateMatrixWorld();
         // console.log(curr.rotation);
 	}
 }
@@ -1356,43 +1041,39 @@ function LOOKATCCD(model, anglelims, axes, target){
 	}
 }
 
-var j1_angles = new Array(-179, 179);
+var j1_angles = new Array(1, 179);
 var j1_axis   = new Vector3(0,0,1);
 var urj1_axis = new Vector3(0,1,0);
 
-var j2_angles = new Array(-120, 60);
-var j2_axis   = new Vector3(0,1,0);
+var j2_angles = new Array(1, 179);
+var j2_axis   = new Vector3(0,0,1);
 var urj2_axis = new Vector3(0,0,1);
 
-var j3_angles = new Array(-60, 60);
+var j3_angles = new Array(0, 179);
 var j3_axis   = new Vector3(0,1,0);
 var urj3_axis = new Vector3(0,1,0);
 
-var j4_angles = new Array(-120, 120);
-var j4_axis   = new Vector3(1,0,0);
-var urj4_axis = new Vector3(0,0,1);
+var j4_angles = new Array(-179, 179);
+var j4_axis   = new Vector3(0, 1, 0);
 
 var j5_angles = new Array(-179, 179);
-var j5_axis   = new Vector3(0,1,0);
-var urj5_axis = new Vector3(1,0,0);
+var j5_axis = new Vector3(0,1,0);
 
-var j6_angles = new Array(0, 0);
-var j6_axis = new Vector3(0,0,0);
-var urj6_axis = new Vector3(0,0,0);
 
-// var j1 = new Vector3(0,0,0);
-// var j2 = new Vector3(0, -116, 137.484);
-// var j3 = new Vector3(0, -116 ,777.484);
-// var j4 = new Vector3(0, 0, 777.484);
-// var j5 = new Vector3(0, 0, 969.484);
-// var j6 = new Vector3(256, 0, 969.484);
+var j1 = new Vector3(0,0,0);
+var j2 = new Vector3(0, 90, 0);
+var j3 = new Vector3(0, 90, 90);
+var j4 = new Vector3(0, 90, 180);
+var j5 = new Vector3(0, 40, 180);
 
+var new_angles = new Array(j1_angles, j2_angles);
+var new_axes   = new Array(j1_axis, j2_axis);
+
+var fanuc_nodes = new Array(j1, j2, j3, j4, j5);
 var fanuc_angles = new Array(j1_angles, j2_angles, j3_angles, j4_angles, j5_angles);
 var fanuc_axes   = new Array(j1_axis, j2_axis, j3_axis, j4_axis, j5_axis);
-var ur_angles = new Array([-179, 179], [-179, 179], [-179, 179], [-179, 179], [-179, 179]);
-var ur_axes = new Array(urj1_axis, urj2_axis, urj3_axis, urj4_axis, urj5_axis, urj6_axis);
-var fanuc_edges = new Array(new Array((0,1)),new Array((1,2)), new Array((2,3)), new Array((3,4)), new Array((4,5)));
-// var fanuc_sizes = new Array([.01,.01,.01], [.01, .01, .01], [.01, .01, .01], [.01, .01, .01], [.01,.01,.01], [.005,.005,.005]);
+var fanuc_edges = new Array(new Array((0,1)),new Array((1,2)), new Array((2,3)), new Array((3,4)));
+var fanuc_sizes = new Array([.2,.2,.2], [.2, .2, .2], [.2, .2, .2], [.2, .2, .2], [.2, .2, .2]);
 // const test = new SimpleArm(fanuc_nodes, fanuc_edges, fanuc_angles, fanuc_axes, fanuc_sizes);
 
 // // TESTING distanceBetween 
@@ -1423,131 +1104,128 @@ var fanuc_edges = new Array(new Array((0,1)),new Array((1,2)), new Array((2,3)),
 
 
 // var fanuc_gltf_nodes = new Array(j1_model, j2_model, j3_model, j4_model, j5_mode, j6_model);
-var new_points = new Array();
-var mir_handler = null;
+var dialog_box_wrapper = document.createElement("div");
+dialog_box_wrapper.setAttribute("id", "data_wrapper");
+var euler_1_wrapper    = document.createElement("p");
+euler_1_wrapper.setAttribute("id", "euler_1_wrapper");
+var euler_2_wrapper    = document.createElement("p");
+euler_2_wrapper.setAttribute("id", "euler_2_wrapper");
+dialog_box_wrapper.append(euler_1_wrapper);
+dialog_box_wrapper.append(euler_2_wrapper);
+document.body.appendChild(dialog_box_wrapper);
+
+function targetTravel (paths, target, delta) { 
+  target.userData.speed = 1;
+  target.position.set(first_location[0], first_location[1], first_location[2]);
+  if (paths) { 
+    for (let i = 0; i < paths.children.length; i ++){ 
+      let child = paths.children[i];
+      let positions = child.geometry.attributes["position"].array;
+      for (let j = 0; j < positions.length; j += 3) {
+        let new_vec = new Vector3( positions[j], positions[j + 1], positions[j + 2]);
+        let direction = new_vec.sub(target.position).normalize();
+        target.position.addScaledVector(direction, target.userData.speed);
+        target.rotateOnWorldAxis(new Vector3(0, 1, 0), radians(90));
+      }
+    }
+  }
+}
+
+function getNextTravelPoint(i, paths, target) { 
+    let counts = paths.map(x => x.length);
+    let temp = 0;
+    let indices = new Array();
+
+    for (let x = 0; x < counts.length; x ++) { 
+      indices.push(counts[x] + temp);
+      temp += counts[x];
+    }
+
+    let sum = counts.reduce(function (a, b) {return a + b;}, 0);
+
+    function index_less (j) {
+      return i <= j - 1;
+    }
+
+    if (i < sum) {
+      let curr_path_index;
+      let path_index = indices.findIndex(index_less);
+      let curr_path  = paths[path_index];
+      if (path_index > 0) { 
+        curr_path_index = i - indices[path_index - 1];
+      }
+      else { 
+        curr_path_index = i;
+      }
+      let curr_vec = curr_path[curr_path_index];
+      target.position.copy(curr_vec);
+      if (!angles_[path_index]) { 
+        angles_[path_index] = new Array();
+      }
+      else {
+        angles_[path_index].push([degrees(servo_hat.rotation.z * -1), degrees(sm_servo_4.rotation.z)]);
+      }
+    }
+    else {
+      return "done";
+    }
+}
+
+
+// For each path in new coords
+// Animate the target to the path
+// solve IK, convert rotation to servo angles, send to server
+
 var check = false;
-var cccc = null;
-var fanuc_robot = new Array();
-var ur_robot = new Array();
-var check_coords = false;
-var export_flag = true;
-var calc_circle = true;
-var target_world_pos = new Vector3();
-// CCDIKGLTF(fanuc_robot, fanuc_angles, fanuc_axes, target2.position);
+var robot;
+var angles_ = {};
+var i = 0;
+var res;
+var frame_wait = 5;
+var curr_frame = 0;
+var server_check = false;
+target2.visible = false;
+
 function animate() {
-	// test.CCDIKIter(target2.position);
-	// if (fanuc_j2){
-	// 	fanuc_j2.rotateY(.1);
-	// }
-	if (check === false){
-		if (fanuc_j1 && fanuc_j2 && fanuc_j3 && fanuc_j4 && fanuc_j5 && fanuc_j6){
-			// fanuc_j2.rotation.set(0, -Math.PI / 2, 0);
-			fanuc_robot = new Array(fanuc_j1, fanuc_j2, fanuc_j3, fanuc_j4, fanuc_j5, fanuc_j6);
-			fanuc_j1.axis = j1_axis;
-			fanuc_j2.axis = j2_axis;
-			fanuc_j3.axis = j3_axis;
-			fanuc_j4.axis = j4_axis;
-			fanuc_j5.axis = j5_axis;
-			fanuc_j6.axis = j6_axis;
-			check = true;
-			console.log("TH");
-		}
-		if (urj1 && urj2 && urj3 && urj4 && urj5 && urj6){
-			ur_robot = new Array(urj1, urj2, urj3, urj4, urj5, urj6);
-			urj1.axis = urj1_axis;
-			urj2.axis = urj2_axis;
-			urj3.axis = urj3_axis;
-			urj4.axis = urj4_axis;
-			urj5.axis = urj5_axis;
-			urj6.axis = urj6_axis;
-			console.log("TH");
-			check = true;
-		}
-	}
+  if (!check) {
+    if (servo_hat && sm_servo_4 && pen){
+      robot = new Array(servo_hat, sm_servo_4, pen);
+      servo_hat.axis = j1_axis;
+      sm_servo_4.axis = j2_axis;
+      check = true;
+    }
+  }
+  else if (robot.length > 0) { 
+    CCDIKGLTF(robot, new_angles, new_axes, target2.position);
+  }
 
-	if (!export_flag && fanuc_gltf !== undefined) {
-		// Instantiate a exporter
-		const exporter = new GLTFExporter();
-
-		// Parse the input and generate the glTF output
-		exporter.parse( fanuc_gltf, function ( gltf ) {
-			console.log( gltf );
-			let output = JSON.stringify( gltf, null, 2 );
-			let blob_output = new Blob( [ output ], { type: 'text/plain' } );
-			console.log( output );
-			downloadJSON( blob_output ,'scene.gltf' );
-		} ); 
-		export_flag = true;
-	}
-
-	if (calc_circle && mir !== undefined && ur_gltf !== undefined && fanuc_gltf !== undefined) {
-		let mir_pos = new Vector3();
-		let tar_pos = new Vector3();
-		ur_gltf.getWorldPosition(mir_pos);
-		fanuc_gltf.getWorldPosition(tar_pos);
-		let mir_pos2 = new Vector2(mir_pos.x, mir_pos.z);
-		let tar_pos2 = new Vector2(tar_pos.x, tar_pos.z);
-		let temp = [mir_pos2, tar_pos2];
-		let c = calculateRemainingPoint(temp);
-
-		// get angles to only keep arc
-		let mir_angle = new Vector2();
-		let tar_angle = new Vector2();
-		mir_angle.subVectors(mir_pos2, c);
-		tar_angle.subVectors(tar_pos2, c);
-
-		mir_angle = mir_angle.angle();
-		tar_angle = tar_angle.angle();
-		let circle = new EllipseCurve();
-
-		if (Math.abs(tar_angle) < Math.abs(mir_angle)) {
-			circle = new EllipseCurve(c.x, c.y, c.r, c.r, tar_angle, mir_angle);
-		}
-		else { 
-			circle = new EllipseCurve(c.x, c.y, c.r, c.r, mir_angle, tar_angle);
-		}
-		let points = circle.getPoints( 1000 );
-
-		points.forEach((p) => {
-			new_points.push(new Vector3(p.x, 0, p.y));
-		})
-
-		let g = new BufferGeometry().setFromPoints( new_points );
-
-		let m = new LineBasicMaterial( { color : 0xff0000 } );
-
-		// Create the final object to add to the scene
-		cccc = new Line( g, m );
-		scene.add(cccc);
-		// cccc.rotateX(Math.PI/2);
-		mir.add(target2);
-		calc_circle = false;
-		cccc.visible = false;
-		console.log(cccc);
-		mir_handler = new MIR(mir, new_points);
-	}
-		
-	if (fanuc_robot.length != 0 && mir !== undefined){
-		mir.getWorldPosition(target_world_pos);
-		target_world_pos.add(new Vector3(0, 50, 0));
-		CCDIKGLTF(fanuc_robot, fanuc_angles, fanuc_axes, target_world_pos);
-		// CCDIKGLTF(ur_robot, ur_angles, ur_axes, target2.position);
-		// for (let i=0; i <= fanuc_robot.length - 2; i++){
-		// 	await sleep(1000);
-		// 	CCDSINGULAR(fanuc_robot[i], fanuc_robot.slice(-1)[0], fanuc_angles[i], fanuc_axes[i], target2.position);
-		// }
-		// if (!check_coords) { console.log(ur_robot); console.log(fanuc_robot); check_coords = true };
-	}
-	if (mir_handler !== null) { 
-		mir_handler.moveMIR();
-	}
-    requestAnimationFrame(animate);
-    controls.update();
+  if (check && travel_vectors && angles_ && res !== "done" && (curr_frame % frame_wait == 0)) { 
+    let res = getNextTravelPoint(i, travel_vectors, target2);
+    euler_1_wrapper.innerText = JSON.stringify(degrees(servo_hat.rotation.z * -1));
+    euler_2_wrapper.innerText = JSON.stringify(degrees(sm_servo_4.rotation.z));
+    i ++;
+    if (res === "done" && !server_check) { 
+      $.ajax({ type: "POST",
+               url: "/get_angles",
+               contentType: 'application/json',
+               data: JSON.stringify(angles_)
+             });
+      server_check = true;
+    }
+  }
+  curr_frame ++;
+  requestAnimationFrame(animate);
+  controls.update();
  
-    render();
+  render();
  
 };
-animate();
+
+
+window.addEventListener('load', function() {
+	animate();
+})
+
 
 function render() {
   renderer.render( scene, camera );

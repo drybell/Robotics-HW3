@@ -47,6 +47,13 @@ import { STLLoader } from './STLLoader.module.js';
 import { GLTFLoader } from './GLTFLoader.js';
 import { GLTFExporter } from './GLTFExporter.js';
 // import { ImageLoader } from './ImageLoader.js';
+
+$.ajax({
+    type: "GET",
+    url: "/image",
+}).success(function(e) {
+    console.log(e.coords);
+});
  
 
 // Find the container id in the DOM and create a new scene
@@ -153,89 +160,89 @@ var forearm;
 var wrist; 
 
 // loading function, takes in the resource URL, loading func, 
-loader.load(
-  // resource URL
-  './static/gltf/PLTW.gltf',
-  function ( gltf ) {
-    console.log(gltf.scene);
-    let pltw = gltf.scene;
+// loader.load(
+//   // resource URL
+//   './static/gltf/PLTW.gltf',
+//   function ( gltf ) {
+//     console.log(gltf.scene);
+//     let pltw = gltf.scene;
 
-    // clone the root of the assembly with no children
-    let pltw_gltf = gltf.scene.clone(false);
+//     // clone the root of the assembly with no children
+//     let pltw_gltf = gltf.scene.clone(false);
 
-    // ORDERING OF THE PLTW HIERARCHY 
-    // BASE --> SHOULDER --> ARM --> FOREARM --> WRIST 
+//     // ORDERING OF THE PLTW HIERARCHY 
+//     // BASE --> SHOULDER --> ARM --> FOREARM --> WRIST 
 
-    // Obtain the 5 children from the root 
-    let children = pltw.clone().children[0].children;
+//     // Obtain the 5 children from the root 
+//     let children = pltw.clone().children[0].children;
 
-    // since the loading is async, we have to iterate through the 
-    // children array in order to obtain the correct ordering
-    // of the hierarchy
+//     // since the loading is async, we have to iterate through the 
+//     // children array in order to obtain the correct ordering
+//     // of the hierarchy
 
-    // The names are the exact names within the Onshape Assembly
-    // with spaces replaced with underscore (_)
+//     // The names are the exact names within the Onshape Assembly
+//     // with spaces replaced with underscore (_)
 
-    for (let i=0; i < children.length; i++){
-      switch (children[i].name){
-        case "Base_<1>":
-          base = children[i];
-          break;
-        case "Shoulder_<1>":
-          shoulder = children[i];
-          break;
-        case "Arm_<1>":
-          // fanuc_j2_original = children[i];
-          // fanuc_j2_original.rotateY(radians(90));
-          arm = children[i];
-          break;
-        case "Forearm_<1>":
-          forearm = children[i];
-          break;
-        case "Wrist_<1>":
-          wrist = children[i];
-          break;
-      }
-    }
+//     for (let i=0; i < children.length; i++){
+//       switch (children[i].name){
+//         case "Base_<1>":
+//           base = children[i];
+//           break;
+//         case "Shoulder_<1>":
+//           shoulder = children[i];
+//           break;
+//         case "Arm_<1>":
+//           // fanuc_j2_original = children[i];
+//           // fanuc_j2_original.rotateY(radians(90));
+//           arm = children[i];
+//           break;
+//         case "Forearm_<1>":
+//           forearm = children[i];
+//           break;
+//         case "Wrist_<1>":
+//           wrist = children[i];
+//           break;
+//       }
+//     }
 
-    // Assign Helper axes in order to see how each 
-    // part is oriented during the reparenting process
+//     // Assign Helper axes in order to see how each 
+//     // part is oriented during the reparenting process
 
-    // let j1axis = new AxesHelper( .50 );
-    // let j2axis = new AxesHelper( .50 );
-    // let j3axis = new AxesHelper( .50 );
-    // let j4axis = new AxesHelper( .50 );
-    // let j5axis = new AxesHelper( .50 );
+//     // let j1axis = new AxesHelper( .50 );
+//     // let j2axis = new AxesHelper( .50 );
+//     // let j3axis = new AxesHelper( .50 );
+//     // let j4axis = new AxesHelper( .50 );
+//     // let j5axis = new AxesHelper( .50 );
 
-    // Change hierarchy to achieve animation
-    // Using attach in order to maintain world
-    // coordinates while reparenting
-    console.log(children);
-    scene.attach(pltw_gltf);
-    pltw_gltf.attach(base);
-    base.attach(shoulder);
-    shoulder.attach(arm);
-    arm.attach(forearm);
-    forearm.attach(wrist);
+//     // Change hierarchy to achieve animation
+//     // Using attach in order to maintain world
+//     // coordinates while reparenting
+//     console.log(children);
+//     scene.attach(pltw_gltf);
+//     pltw_gltf.attach(base);
+//     base.attach(shoulder);
+//     shoulder.attach(arm);
+//     arm.attach(forearm);
+//     forearm.attach(wrist);
 
-    pltw_gltf.scale.set(200,200,200);
-    pltw_gltf.position.set(0,0,0);
-    shoulder.rotation.set(0,-Math.PI, 0);
-    console.log(pltw_gltf);
-  },
-  // called while loading is progressing
-  function ( xhr ) {
+//     pltw_gltf.scale.set(200,200,200);
+//     pltw_gltf.position.set(0,0,0);
+//     shoulder.rotation.set(0,-Math.PI, 0);
+//     console.log(pltw_gltf);
+//   },
+//   // called while loading is progressing
+//   function ( xhr ) {
 
-    console.log( ( xhr.loaded / xhr.total * 100 ) + '% loaded' );
+//     console.log( ( xhr.loaded / xhr.total * 100 ) + '% loaded' );
 
-  },
-  // called when loading has errors
-  function ( error ) {
+//   },
+//   // called when loading has errors
+//   function ( error ) {
 
-    console.log( error );
+//     console.log( error );
 
-  }
-);
+//   }
+// );
 
 // Current Inverse Kinematics Algo used for demo 
 // purposes. Still needs a little work on keeping
@@ -350,12 +357,7 @@ function animate(){
         check = true;
       }
     }
-
-    if (pltw_robot.length != 0) { 
-      // CCDIKGLTF(pltw_robot, pltw_angles, pltw_axes, target.position);
-      shoulder.rotateY(.1);
-    }
-
+    
     requestAnimationFrame(animate);
     controls.update();
  

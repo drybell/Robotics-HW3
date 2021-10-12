@@ -1,0 +1,38 @@
+<html>
+	<head>
+		<title>Draw Something!</title>
+		<script src="{{ url_for('static', filename='js/draw.js') }}"></script>
+		<link href="{{ url_for('static', filename='stylesheets/style.css') }}" rel="stylesheet" type="text/css"/>
+		<script src="https://ajax.googleapis.com/ajax/libs/jquery/2.1.1/jquery.min.js"></script>
+	</head>
+
+	<body>
+		<div class ="container">
+
+			<div class='header'>
+				<h1 class='header-text'> Draw Your Name ! </h1>
+				<!-- <h2 class='header-shadow'> Draw Your Name !</h2> -->
+			</div>
+
+			<div class="whiteboard-container">
+				<div class="whiteboard">
+					<canvas id="canvas" width="600px" height="400px" style="background-color: white;">Woops</canvas>
+				</div>
+				<div class="button-container"> 
+					<button id="erase-button"> Erase </button>
+					<button id="send"> Send To Server </button>
+				</div>
+			</div>
+		</div>
+	</body>
+</html>
+
+<!-- CSS COMMENTS 
+	title container 
+	canvas container
+	two buttons (erase, submit)
+
+	drop shadow, rounded edges
+
+	on load, quick animation translation up, title, then canvas, then buttons
+	 -->
